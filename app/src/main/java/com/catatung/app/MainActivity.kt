@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webView)
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
 
+        setupCookieManager()
         setupWebView()
         setupSwipeRefresh()
 
@@ -35,17 +36,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupCookieManager() {
+        // Enable cookies untuk persist session login
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
+        cookieManager.setAcceptThirdPartyCookies(webView, true)
+    }
+
     private fun setupWebView() {
         val webSettings = webView.settings
+        
+        // JavaScript & DOM Storage - penting untuk session
         webSettings.javaScriptEnabled = true
         webSettings.domStorageEnabled = true
         webSettings.databaseEnabled = true
+        
+        // Cache settings untuk persist session
         webSettings.cacheMode = WebSettings.LOAD_DEFAULT
+        
+        // Local Storage & File Access
+        webSettings.allowFileAccess = true
+        webSettings.allowContentAccess = true
+        
+        // Display settings
         webSettings.loadWithOverviewMode = true
         webSettings.useWideViewPort = true
         webSettings.setSupportZoom(true)
         webSettings.builtInZoomControls = true
         webSettings.displayZoomControls = false
+        
+        // Mixed content (jika web menggunakan http dan https)
+        webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
@@ -56,6 +77,9 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 swipeRefreshLayout.isRefreshing = false
+                
+                // Flush cookies setelah halaman selesai load
+                CookieManager.getInstance().flush()
             }
 
             override fun onReceivedError(
@@ -174,6 +198,24 @@ class MainActivity : AppCompatActivity() {
         val activeNetwork = connectivityManager.activeNetwork ?: return false
         val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
         return networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Simpan cookies saat app di-pause
+        CookieManager.getInstance().flush()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Sync cookies saat app di-resume
+        CookieManager.getInstance().setAcceptCookie(true)
+    }
+
+    override fun onDestroy() {
+        // Pastikan cookies tersimpan sebelum destroy
+        CookieManager.getInstance().flush()
+        super.onDestroy()
     }
 
     @Deprecated("Deprecated in Java")
